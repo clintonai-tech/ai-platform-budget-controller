@@ -7,6 +7,9 @@ Three groups live here:
   :class:`Tier`, :class:`DataQualityFlag`).
 * **Policy models** — the validated shape of ``config/budget_policy.yaml``
   (:class:`BudgetPolicy` and its parts). Loading is done in ``policy.py``.
+* **Spend models** — :class:`SpendRow`, :class:`GroupSpend`, :class:`SpendSnapshot`,
+  the tabular structures produced by ``spend_loader.py`` (frozen dataclasses, not
+  Pydantic: the loader parses tolerantly and records problems as flags).
 * **Output model** — :class:`Decision`, one per team per evaluation run.
 
 All models forbid unknown fields so a typo in the policy file fails loudly
@@ -15,10 +18,14 @@ rather than being silently ignored.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from datetime import date
 from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+#: ``by_team`` key used for spend on API keys that carry no team.
+UNOWNED_TEAM = "__unowned__"
 
 # --------------------------------------------------------------------------- #
 # Enums
@@ -236,3 +243,68 @@ class Decision(BaseModel):
     snapshot_age_hours: float
     snapshot_stale: bool
     data_quality_flags: list[DataQualityFlag] = Field(default_factory=list)
+
+
+# --------------------------------------------------------------------------- #
+# Spend models (populated by spend_loader.py)
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True)
+class SpendRow:
+    """One CSV row after tolerant parsing.
+
+    Nothing here raises on bad input: unparseable or missing values are coerced
+    to a safe default (``None`` date, ``0`` counts, ``0.0`` cost) and the
+    problem is recorded in :attr:`flags` so it stays visible downstream.
+    """
+
+    line_number: int
+    date: date | None
+    api_key: str
+    team: str | None
+    model: str
+    request_count: int
+    prompt_tokens: int
+    completion_tokens: int
+    cost_usd: float
+    flags: tuple[DataQualityFlag, ...] = ()
+
+    @property
+    def is_owned(self) -> bool:
+        return self.team is not None
+
+
+@dataclass(frozen=True)
+class GroupSpend:
+    """Accumulated spend for one grouping key (a team, an API key, or a model)."""
+
+    label: str
+    spend_usd: float
+    request_count: int
+    prompt_tokens: int
+    completion_tokens: int
+    row_count: int
+    models: tuple[str, ...] = ()
+    flags: tuple[DataQualityFlag, ...] = ()
+
+
+@dataclass(frozen=True)
+class SpendSnapshot:
+    """The whole spend file after parsing and aggregation."""
+
+    rows: tuple[SpendRow, ...]
+    as_of: date | None
+    first_date: date | None
+    by_team: dict[str, GroupSpend] = field(default_factory=dict)
+    by_api_key: dict[str, GroupSpend] = field(default_factory=dict)
+    by_model: dict[str, GroupSpend] = field(default_factory=dict)
+    total_spend_usd: float = 0.0
+
+    @property
+    def flagged_rows(self) -> tuple[SpendRow, ...]:
+        return tuple(r for r in self.rows if r.flags)
+
+    @property
+    def has_unowned_spend(self) -> bool:
+        return UNOWNED_TEAM in self.by_team

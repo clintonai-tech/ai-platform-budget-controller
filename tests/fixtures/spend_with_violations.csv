@@ -1,0 +1,6 @@
+date,api_key,team,model,request_count,prompt_tokens,completion_tokens,cost_usd
+2025-11-01,key-alpha-prod,Alpha,claude-sonnet-4-6,100,200000,50000,3.00
+2025-11-02,key-personal-x,,gpt-5.4,5000,9000000,2000000,50.00
+2025-11-03,key-alpha-prod,Alpha,claude-sonnet-4-6,0,0,0,7.25
+2025-11-04,key-alpha-prod,Alpha,claude-sonnet-4-6,80,160000,40000,
+2025-11-05,key-beta-prod,Beta,claude-haiku-4-5,200,400000,90000,-1.50

@@ -67,6 +67,8 @@ Downgrade behavior must depend on workload:
 
 The hot path should not depend on AWS billing data because billing signals are delayed. LiteLLM/Postgres should provide operational spend. AWS CUR and Cost Explorer should reconcile provider and infrastructure bills daily.
 
+A first implementation of the tiered enforcement described above (a controller that reads accumulated spend, evaluates the 75/90/100% thresholds per workload, applies workload-specific downgrade rules, and emits LiteLLM-shaped policy intent) is included in this repository as the Task 2 component. It also surfaces the governance gaps visible in the sample data: un-attributed personal-key spend, a blank cost value, and teams calling models outside their registered allow-list.
+
 ## 2. Data Governance
 
 Data governance should be structural: data movement, logging, retention, and replayability should come from route policy, not developer judgment at call time.
@@ -102,6 +104,18 @@ Logging should have explicit modes:
 - `redacted_trace`: prompt/response content after approved redaction. Useful for lower-risk internal workflows.
 - `full_audit`: prompt template version, model version, retrieval context IDs, tool calls, approval records, final output, hashes of sensitive inputs/outputs, and policy decisions. This should be reserved for KYC-like workflows.
 
+Retention should be a property of the route's data class, not a per-team choice. Proposed defaults, subject to Legal/DPO confirmation:
+
+| Data | Retention | Store |
+| --- | --- | --- |
+| `metadata_only` records (request ID, team, route, model, token counts, cost, latency, status, policy decision) | 400 days, then aggregate-only | Postgres, then cold archive in S3 |
+| `redacted_trace` content | 30 to 90 days | Langfuse |
+| `full_audit` bundles (KYC and equivalent) | 7 years, matching regulatory retention for KYC records | S3 with Object Lock and KMS |
+| Datadog derived metrics | 15 months (Datadog default) | Datadog |
+| Un-redacted provider prompt/response | not retained by the platform; relies on Bedrock no-logging and the external provider ZDR term | not stored |
+
+The position is to retain the minimum that answers "what happened" (metadata, input/output hashes, template and policy versions, retrieval document IDs, policy decisions) for every request, and to keep raw content only where a named regulatory or dispute-resolution need exists.
+
 Datadog should receive only derived metrics and sanitized tags. Langfuse may hold richer traces where policy permits, but access should be role-based and retention-bound.
 
 For reconstructing past interactions, the platform should store enough provenance to explain what happened without logging everything forever. A replay/audit record should include gateway request ID, Langfuse trace ID, model alias and resolved model, provider, prompt template version, system prompt version, policy version, tool manifest version, retrieval document IDs and hashes, input/output hashes, policy decisions, and approval IDs.
@@ -110,7 +124,7 @@ For reconstructing past interactions, the platform should store enough provenanc
 
 Agentic safety should sit at the platform boundary between agents and tools. Application teams should inherit safe defaults instead of building separate safety layers.
 
-The platform should introduce an Agent Tool Gateway or policy middleware on the MCP/tool-call path. Every tool call should be classified, authorized, budgeted, and logged before execution.
+LiteLLM proxies model calls, not MCP or tool calls, so agentic safety needs its own enforcement point. The platform should run a dedicated MCP gateway as a sibling service to LiteLLM, sharing the same Postgres and policy engine. All agent tool and MCP traffic is configured to route through it; agents are handed tool endpoints that point at the gateway, not at the tool servers, and direct egress from agent workloads to tool servers is blocked the same way direct provider access is. Every tool call is classified, authorized, budgeted, and logged at this gateway before execution.
 
 Recommended technologies:
 
@@ -139,6 +153,8 @@ Default posture:
 - Tool results that re-enter the model are treated as untrusted input.
 
 Each decision log should include agent ID, user ID, team, session ID, tool name, normalized arguments or argument hash, target resource, classification, policy version, decision, approval ID, execution result, and timestamp. This gives the platform a forensic trail without relying on application teams to remember to log safely.
+
+Scaling: the gateway is a stateless policy check with all state in Postgres, so it scales horizontally as agent traffic grows. New MCP servers and tools onboard through the same pull-request registry as models (owner, scopes, default impact level), and every new tool starts read-only until a route registration promotes it. As agents become the dominant traffic shape, the classification table and destructive-action budgets become the main tuning surface, and the same forensic log feeds the observability SLIs below (approval rate, destructive-action block rate).
 
 Bedrock Guardrails can help with content controls, sensitive information filters, and grounding checks for model input/output. They should complement tool authorization, not replace it.
 
@@ -230,19 +246,43 @@ Workload-specific sourcing:
 - AdvisorChat: use managed premium models in approved regions. Reliability, latency, and quality matter more than lowest unit cost.
 - KYC: use managed models with strong auditability, regional controls, and reproducibility. Avoid experimental sourcing.
 - DigestBot: best candidate for Bedrock managed open-weight models or cheaper managed models because it is batch and cost-sensitive.
-- DevAgent: use stronger managed models for planning/tool use, cheaper models for summarization or read-only helper steps.
+- DevAgent: largest driver and output-heavy, so a frontier-to-frontier switch saves little (see the worked example below). Keep a managed model for planning and write-capable tool steps; qualify a managed open-weight model for summarisation and read-only helper steps, where most of the tokens are.
 - Research: provide a broad but quota-controlled catalog.
 - Marketing: use low-cost approved models by default.
 
-The spend sample suggests DevAgent is the largest cost driver at about $20k over 30 days, followed by AdvisorChat at about $9.2k. That is enough to justify routing, prompt optimization, caching, and managed open-weight experiments. It is not automatically enough to justify self-hosting. Self-hosting only wins when GPU utilization is high, workloads are predictable, compliance accepts the model/runtime path, and the platform can own inference reliability.
+### Assumptions for the math
 
-What would change the recommendation:
+- Managed frontier (Anthropic Sonnet class, Bedrock Frankfurt): about $3 per 1M input tokens, $15 per 1M output.
+- Bedrock managed open-weight (Llama or Mistral 70B class): about $0.75 per 1M blended.
+- Self-hosted serving node: one reserved GPU instance able to serve a quantised 70B at roughly 2,500 output tokens/sec sustained, about $3.5/hr on a one-year commit, so about $2,550 per month per node and about 6.5B tokens/month at full utilisation. Assume two nodes for redundancy and peak headroom, plus roughly 0.3 to 0.5 FTE of platform on-call to own inference reliability.
+- Observed spend (`spend_30d.csv`, 30 days): DevAgent about $20.1k on 2.38B tokens (100% on the external premium model), AdvisorChat about $9.2k on 1.86B, KYC about $2.8k, DigestBot about $2.0k on 1.41B, Research about $0.3k, Marketing about $8, un-attributed personal keys about $2.0k. Platform total about $36.5k per 30 days, roughly $440k per year.
 
-- Sustained monthly spend grows enough that managed provider margin dominates total cost.
-- A small set of models handles most traffic with predictable utilization.
-- Open-weight quality meets route-specific eval thresholds.
-- Security and Legal approve the data path.
-- The platform can staff GPU operations and model serving on-call.
+### Worked example: DevAgent, the largest driver
+
+DevAgent runs entirely on the external premium model: about 1.24B input and 1.14B output tokens per month, roughly 79M tokens/day, an average of about 915 tokens/sec.
+
+| Option | Estimated monthly cost | Note |
+| --- | --- | --- |
+| Stay on external premium | ~$20k | observed; blended about $8.5 per 1M |
+| Route to managed Anthropic Sonnet | ~$20.8k | no saving: the workload is output-heavy and Sonnet output is $15 per 1M |
+| Bedrock managed open-weight (~$0.75 per 1M) | ~$1.8k | needs eval parity; quality risk on multi-step tool use |
+| Self-host, two reserved nodes | ~$5.1k plus ~0.4 FTE | 79M tokens/day is about 37% of one node, so utilisation is poor |
+
+The instructive result is that switching frontier providers barely moves DevAgent's bill, because it generates almost as many output tokens as input. Only a cheaper model class (managed open-weight) or self-hosting changes the economics, and self-hosting is the worst of those because the workload cannot keep a GPU node busy.
+
+Self-hosting only overtakes managed open-weight when a single model sustains at least two nodes' worth of throughput around the clock, on these assumptions roughly 13B tokens/month for one model (about 430M tokens/day), and only once Security and Legal accept the runtime and the platform can staff GPU on-call. Nothing in today's mix is within 5x of that, and the entire platform's annual spend (~$440k) is less than the fully loaded cost of the extra headcount a self-hosting programme needs.
+
+### Batch workloads
+
+DigestBot (about $2.0k/month on Anthropic Haiku, blended about $1.4 per 1M) is the right first open-weight pilot: batch, cost-sensitive, not customer-facing, and already flagged as tolerant of a silent downgrade. The direct saving is modest, perhaps $0.5k to $1k per month; the real value is standing up the eval and qualification pipeline (Langfuse datasets and scores, regression thresholds) that every later sourcing decision depends on.
+
+### What would change the recommendation
+
+- Sustained volume on one or two models rising past the self-host break-even above.
+- Open-weight quality clearing route-specific eval thresholds, especially for agentic tool use.
+- Security and Legal approving an open-weight model and its runtime for a given data class.
+- A commitment to staff GPU serving and inference on-call.
+- Managed-provider price increases, or capacity or latency problems in the Frankfurt region.
 
 ## 7. Six-Month Direction
 
@@ -255,6 +295,8 @@ Third, ship data governance: logging modes, retention rules, audit bundles, KMS/
 Fourth, ship agentic safety: MCP/tool registry, action classification, policy engine, destructive-action budgets, approval flow, and forensic logs.
 
 Fifth, ship self-service modules and model sourcing expansion: Terraform modules, CI policy validation, model onboarding templates, and a managed open-weight pilot for DigestBot or Marketing.
+
+Dependencies: cost and operational visibility (2) and data governance (3) both depend on the route registry and mandatory metadata from (1), because attribution and logging mode are route properties. Agentic safety (4) reuses the policy-engine and forensic-logging patterns established in (3). Self-service modules (5) template whatever (1) through (4) have already standardised, so they ship last. The open-weight eval pipeline is the one piece with no upstream dependency and can run in parallel with (2).
 
 Explicit deferrals:
 

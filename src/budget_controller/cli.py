@@ -13,6 +13,7 @@ Exit codes: ``0`` success, ``1`` findings present with ``--strict``,
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
@@ -101,7 +102,7 @@ def evaluate_command(
 # --------------------------------------------------------------------------- #
 
 
-def _load(loader, path, error_type):  # type: ignore[no-untyped-def]
+def _load[T](loader: Callable[[Path], T], path: Path, error_type: type[Exception]) -> T:
     try:
         return loader(path)
     except error_type as exc:

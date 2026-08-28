@@ -5,18 +5,22 @@
 Take-home for an AI Platform Engineer role at "Scalable Fictional". The platform
 gives internal teams governed access to LLMs through a LiteLLM gateway.
 
-- **Assignment**: `docs/AI Platform Engineer - Case Study 2026.pdf`
+- **Assignment**: `docs/AI Platform Engineer - Case Study 2026.pdf` (git-ignored)
 - **Task 1 — design doc** (done): `task1-design.md`
-- **Task 2 — build one component**: chose **Option B — tiered budget enforcement
-  with graceful downgrade**. Build plan: `task2-plan.md` (8 tickets).
-- **Task 3 — architecture diagram**: not started.
+- **Task 2 — build one component** (done): **Option B — tiered budget enforcement
+  with graceful downgrade**. Build plan: `task2-plan.md` (8 tickets, all done).
+- **Task 3 — architecture diagram**: README has a mermaid flow; a standalone
+  diagram deliverable is not done.
 
 The component (`budget-controller`) is a periodic controller: it reads accumulated
 team spend, evaluates declarative budget policy against 75% / 90% / 100%
 thresholds, and emits deterministic enforcement decisions (warn, urgent-warn,
-downgrade, throttle, block, quarantine) that could later be pushed into LiteLLM.
-In this version the spend source is the brief's CSV; there is no live gateway
-mutation.
+downgrade, throttle, block, quarantine, require-explicit-signal) plus a schema
+1.0 LiteLLM policy-intent JSON. The spend source is the brief's CSV; the exporter
+is dry-run and there is no live gateway mutation.
+
+Pipeline: `spend_loader` + `policy` → `evaluator.evaluate(policy, snapshot, now=)`
+→ `exporters.build_export` → `cli` (`budget-controller evaluate`).
 
 ## Layout
 
@@ -33,11 +37,12 @@ mutation.
 Everything runs through `uv` (Python 3.13 project):
 
 ```bash
-uv sync                          # install / update .venv from uv.lock
-uv run pytest                    # tests
-uv run ruff check .              # lint
-uv run ruff format --check .     # format check
-uv run budget-controller --help  # run the CLI
+uv sync                                        # install / update .venv from uv.lock
+uv run pytest                                  # 93 tests
+uv run ruff check .                            # lint
+uv run ruff format --check .                   # format check
+uv run budget-controller evaluate              # run the CLI (table output)
+uv run budget-controller evaluate --format json --as-of 2025-12-01
 ```
 
 If conda is active you'll see a harmless
@@ -52,6 +57,8 @@ If conda is active you'll see a harmless
 - ruff lint rules `E, F, I, UP, B, SIM`, line length 100. Ruff is the only
   static-analysis gate; there is no separate type checker.
 - Tests live under `tests/`; `pyproject.toml` sets `pythonpath = ["src"]`.
+  Shared builders (`make_snapshot`, `one_team_policy`) are in `tests/_helpers.py`
+  (no `test_` prefix, so pytest does not collect it).
 
 ## Design rules that bind the code
 
@@ -73,7 +80,6 @@ pre-call cost blocking.
 
 ## Workflow
 
-Follow `task2-plan.md` tickets in order. Small and complete beats large and half
-done. The plan at `~/.claude/plans/you-are-helping-me-floating-dragonfly.md`
-records recommended adjustments to Tickets 2+ (deterministic clock, model cost
-table, tier-exercising budgets, governance surfacing, staleness behaviour).
+Tickets 1–8 in `task2-plan.md` are complete. Small and complete beats large and
+half done. Keep the README, this file, and the tests in sync when changing
+behaviour. Every commit message: no "Claude Code" / co-author lines (user asked).

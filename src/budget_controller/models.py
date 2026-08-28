@@ -81,10 +81,16 @@ class Tier(StrEnum):
     ECONOMY = "economy"
 
 
+#: Higher rank == more expensive. A downgrade is only meaningful when it moves
+#: from a higher rank to a lower one.
+TIER_RANK: dict[Tier, int] = {Tier.ECONOMY: 1, Tier.STANDARD: 2, Tier.PREMIUM: 3}
+
+
 class DataQualityFlag(StrEnum):
     """Governance / data-quality problems found while aggregating spend."""
 
     MISSING_TEAM = "missing_team"
+    UNKNOWN_TEAM = "unknown_team"
     BLANK_COST = "blank_cost"
     NEGATIVE_COST = "negative_cost"
     ZERO_REQUESTS_NONZERO_COST = "zero_requests_nonzero_cost"
@@ -239,7 +245,7 @@ class Decision(BaseModel):
     enforcement_mode: EnforcementMode | None = None
     downgrade_from: str | None = None
     downgrade_to: str | None = None
-    as_of: date
+    as_of: date | None
     snapshot_age_hours: float
     snapshot_stale: bool
     data_quality_flags: list[DataQualityFlag] = Field(default_factory=list)

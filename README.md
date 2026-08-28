@@ -14,10 +14,11 @@ Scaffold and inputs are in place (Tickets 1-2):
 - Input spend data at `data/spend_30d.csv` (copy of the brief's file).
 - Declarative policy at `config/budget_policy.yaml`.
 
-Done so far: typed domain models, policy loader, and the spend loader
-(CSV parsing + aggregation by team / API key / model, with data-quality flags).
-Policy evaluator, LiteLLM exporter, and the full CLI follow in later tickets per
-[task2-plan.md](task2-plan.md).
+Done so far: typed domain models, policy loader, spend loader (CSV parsing +
+aggregation with data-quality flags), and the policy evaluator (deterministic
+per-team threshold decisions + governance violations, with an injected clock and
+staleness handling). LiteLLM exporter and the full CLI follow in later tickets
+per [task2-plan.md](task2-plan.md).
 
 ## Input Data and Configuration
 

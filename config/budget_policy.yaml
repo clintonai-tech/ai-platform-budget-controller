@@ -1,0 +1,149 @@
+# Budget policy for the tiered budget controller (Task 2, Option B).
+#
+# The controller aggregates accumulated spend per team for the current billing
+# period, compares it to the budget below, and emits one deterministic decision
+# per team. Thresholds and actions here are the ONLY place enforcement
+# behaviour is defined; the code contains no hard-coded team names or numbers.
+#
+# Action vocabulary (enum) used by `at_100_percent` and by the evaluator:
+#   allow                  - under budget, no action
+#   warn                   - >= warn_at, notify the owning team
+#   urgent_warn            - >= urgent_warn_at, notify team + platform
+#   downgrade              - route eligible traffic to a cheaper model
+#   throttle               - reduce RPM/TPM / max parallel requests
+#   block                  - reject further requests until reset
+#   require_explicit_signal- keep serving but tell the app it is over budget
+#   quarantine             - unowned spend: isolate the key, page platform
+
+version: 1
+
+defaults:
+  # Explicit tier boundaries as a fraction of monthly_budget_usd.
+  thresholds:
+    warn_at: 0.75
+    urgent_warn_at: 0.90
+    enforce_at: 1.00
+
+  # The spend snapshot is always somewhat stale (see task1-design.md, section 1).
+  # If it is older than this, the evaluator stays conservative: it will not use
+  # stale data to LIFT an existing enforcement action, only to raise one.
+  max_staleness_hours: 48
+
+  currency: USD
+
+# Directional model price reference (USD per 1M tokens). Used to pick a concrete
+# downgrade target and to estimate the saving in the exporter. Not billing data.
+models:
+  claude-opus-4-7:   { tier: premium,  input_per_1m: 15.00, output_per_1m: 75.00 }
+  gpt-5.4:           { tier: premium,  input_per_1m: 10.00, output_per_1m: 30.00 }
+  claude-sonnet-4-6: { tier: standard, input_per_1m: 3.00,  output_per_1m: 15.00 }
+  gpt-4o:            { tier: standard, input_per_1m: 2.50,  output_per_1m: 10.00 }
+  claude-haiku-4-5:  { tier: economy,  input_per_1m: 0.80,  output_per_1m: 4.00 }
+  gpt-5.4-mini:      { tier: economy,  input_per_1m: 0.60,  output_per_1m: 2.40 }
+
+# Monthly budgets are an ASSUMPTION. The brief lists the per-team spend envelope
+# as an open question, so these are set from the 30-day sample so that every
+# tier and both enforcement styles are exercised:
+#
+#   Team         30d spend   budget    ~% used   resulting decision
+#   DevAgent     $20,153     $18,000   112%      enforce -> throttle
+#   AdvisorChat  $ 9,180     $10,000    92%      urgent_warn
+#   KYC          $ 2,795     $ 3,600    78%      warn
+#   DigestBot    $ 1,990     $ 2,600    77%      warn
+#   Research     $   335     $ 1,000    34%      allow
+#   Marketing    $     8     $   500     2%      allow
+#   (unowned)    $ 2,003       n/a      n/a      quarantine
+teams:
+  AdvisorChat:
+    monthly_budget_usd: 10000
+    default_model: claude-sonnet-4-6
+    allowed_models: [claude-sonnet-4-6]
+    enforcement_mode: enforce          # enforce | monitor
+    silent_downgrade_allowed: false
+    at_100_percent: require_explicit_signal
+    downgrade_model: null
+    escalation: "#advisorchat-oncall"
+    notes: >-
+      Customer-facing financial Q&A, latency-sensitive and regulated. A silent
+      model swap is not acceptable: at budget the application is told explicitly
+      so it can degrade deliberately or move to an approved-equivalent model.
+
+  KYC:
+    monthly_budget_usd: 3600
+    default_model: claude-sonnet-4-6
+    allowed_models: [claude-sonnet-4-6]
+    enforcement_mode: enforce
+    silent_downgrade_allowed: false
+    at_100_percent: block
+    downgrade_model: null
+    escalation: "#kyc-platform"
+    notes: >-
+      Regulated document processing with a full audit-trail requirement.
+      Reproducibility outweighs cost: block and escalate rather than change
+      models mid-period.
+
+  DevAgent:
+    monthly_budget_usd: 18000
+    default_model: gpt-5.4
+    allowed_models: [gpt-5.4]
+    enforcement_mode: enforce
+    silent_downgrade_allowed: false
+    at_100_percent: throttle
+    downgrade_model: null
+    escalation: "#devagent"
+    notes: >-
+      Agentic developer assistant with write-capable MCP tools. Read-only helper
+      calls could tolerate a cheaper model, but that split is not modelled yet,
+      so throttle RPM/TPM rather than downgrade a session that may be mid-write.
+
+  DigestBot:
+    monthly_budget_usd: 2600
+    default_model: claude-haiku-4-5
+    allowed_models: [claude-haiku-4-5]
+    enforcement_mode: enforce
+    silent_downgrade_allowed: true
+    at_100_percent: downgrade
+    downgrade_model: claude-haiku-4-5
+    escalation: "#digestbot"
+    notes: >-
+      Internal batch news summarisation, explicitly cost-sensitive and not
+      user-facing. Safe to downgrade silently. Already on the economy tier, so a
+      real over-budget event would fall through to throttle (handled in the
+      evaluator).
+
+  Research:
+    monthly_budget_usd: 1000
+    default_model: claude-sonnet-4-6
+    allowed_models: [claude-sonnet-4-6]
+    enforcement_mode: enforce
+    silent_downgrade_allowed: true
+    at_100_percent: downgrade
+    downgrade_model: claude-haiku-4-5
+    escalation: "#research"
+    notes: >-
+      Exploratory, bursty work on a shared key. Tolerates a silent downgrade or
+      throttle once over budget.
+
+  Marketing:
+    monthly_budget_usd: 500
+    default_model: gpt-5.4-mini
+    allowed_models: [gpt-5.4-mini]
+    enforcement_mode: enforce
+    silent_downgrade_allowed: true
+    at_100_percent: downgrade
+    downgrade_model: gpt-5.4-mini
+    escalation: "#marketing"
+    notes: >-
+      Low-volume content drafts. Cheapest approved model by default; already on
+      the economy tier.
+
+# Spend on a key with no team / owner / cost centre. The sample data contains
+# unowned spend on key-personal-mhuber (~$2,003 over three days). This should be
+# structurally impossible, so it is quarantined regardless of amount rather than
+# absorbed silently.
+unowned:
+  action: quarantine
+  escalation: "#ai-platform"
+  notes: >-
+    Quarantine the key (tiny isolated budget or block) and page the platform
+    team. Missing ownership is a first-class governance violation, not a warning.

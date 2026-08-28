@@ -25,7 +25,7 @@ mutation.
 | `src/budget_controller/` | The package. `cli.py` is the Typer entry point. |
 | `tests/` | pytest suite. Small deterministic fixtures, not the full CSV. |
 | `data/spend_30d.csv` | Input spend data (copy of the brief's file). |
-| `config/` | `budget_policy.yaml` — added in Ticket 2. |
+| `config/budget_policy.yaml` | Declarative budget policy — all thresholds, budgets, per-team actions. |
 | `docs/` | Reference only: assignment PDF, spend CSV, Langfuse sample. |
 
 ## Commands

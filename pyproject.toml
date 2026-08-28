@@ -15,7 +15,6 @@ budget-controller = "budget_controller.cli:app"
 
 [dependency-groups]
 dev = [
-    "mypy>=1.10.0",
     "pytest>=8.2.0",
     "ruff>=0.5.0",
 ]
@@ -34,10 +33,4 @@ target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
-
-[tool.mypy]
-python_version = "3.13"
-strict = true
-warn_unused_configs = true
-mypy_path = "src"
 

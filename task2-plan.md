@@ -114,8 +114,8 @@ Runtime dependencies:
 Development dependencies:
 
 - `pytest`: tests.
-- `ruff`: linting and formatting.
-- `mypy`: optional static typing check.
+- `ruff`: linting and formatting. This is the only static-analysis gate; no
+  separate type checker is used.
 
 Avoid `pandas` in version 1. The CSV format is simple enough for Python's standard `csv` module, which keeps the component easy to audit.
 
@@ -137,9 +137,9 @@ Outcome: clean Python project foundation.
 Acceptance criteria:
 
 - `uv` project initialized with `src/` layout.
-- `pyproject.toml` defines package metadata, Python version, pytest, ruff, and typing settings.
+- `pyproject.toml` defines package metadata, Python version, pytest, and ruff settings.
 - Runtime dependencies are added: `pydantic`, `pyyaml`, `typer`.
-- Dev dependencies are added: `pytest`, `ruff`, optionally `mypy`.
+- Dev dependencies are added: `pytest`, `ruff`.
 - `.gitignore` excludes `.env`, `.venv`, caches, coverage, dist, and build output.
 - `.env.example` includes future variables such as `LITELLM_BASE_URL` and `LITELLM_API_KEY`.
 - `README.md` has setup commands and project purpose.

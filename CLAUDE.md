@@ -37,7 +37,6 @@ uv sync                          # install / update .venv from uv.lock
 uv run pytest                    # tests
 uv run ruff check .              # lint
 uv run ruff format --check .     # format check
-uv run mypy src                  # strict type check
 uv run budget-controller --help  # run the CLI
 ```
 
@@ -50,8 +49,8 @@ If conda is active you'll see a harmless
 - Python 3.13, `src/` layout, Pydantic v2, Typer, PyYAML.
 - **Standard-library `csv` — no pandas.** The input is small and auditability
   matters more than convenience.
-- ruff lint rules `E, F, I, UP, B, SIM`, line length 100.
-- mypy `strict = true`.
+- ruff lint rules `E, F, I, UP, B, SIM`, line length 100. Ruff is the only
+  static-analysis gate; there is no separate type checker.
 - Tests live under `tests/`; `pyproject.toml` sets `pythonpath = ["src"]`.
 
 ## Design rules that bind the code

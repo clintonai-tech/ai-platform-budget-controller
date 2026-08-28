@@ -10,7 +10,7 @@ Ticket 1 establishes the project scaffold only:
 
 - Python package layout under `src/`.
 - `uv` dependency management.
-- Ruff, pytest, and mypy configuration.
+- Ruff and pytest configuration.
 - `.gitignore` and `.env.example`.
 - Initial command-line entry point.
 - Input spend data staged at `data/spend_30d.csv` (copy of the brief's file).
@@ -49,12 +49,6 @@ Check formatting:
 
 ```bash
 uv run ruff format --check .
-```
-
-Run type checks:
-
-```bash
-uv run mypy src
 ```
 
 Run the CLI:

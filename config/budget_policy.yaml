@@ -29,6 +29,10 @@ defaults:
   # stale data to LIFT an existing enforcement action, only to raise one.
   max_staleness_hours: 48
 
+  # When a team is throttled at 100%, scale its RPM/TPM/parallel limits to this
+  # percent of their current values.
+  throttle_to_pct: 50
+
   currency: USD
 
 # Directional model price reference (USD per 1M tokens). Used to pick a concrete

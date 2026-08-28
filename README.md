@@ -15,10 +15,22 @@ Scaffold and inputs are in place (Tickets 1-2):
 - Declarative policy at `config/budget_policy.yaml`.
 
 Done so far: typed domain models, policy loader, spend loader (CSV parsing +
-aggregation with data-quality flags), and the policy evaluator (deterministic
-per-team threshold decisions + governance violations, with an injected clock and
-staleness handling). LiteLLM exporter and the full CLI follow in later tickets
-per [task2-plan.md](task2-plan.md).
+aggregation with data-quality flags), the policy evaluator (deterministic
+per-team threshold decisions + governance violations, injected clock, staleness
+handling), and the LiteLLM policy-intent exporter (dry-run JSON only). The CLI
+that ties them together follows next per [task2-plan.md](task2-plan.md).
+
+### Policy-intent JSON (exporter)
+
+`build_export()` / `export_json()` turn an evaluation into a stable
+`schema_version: "1.0"` document: metadata (`as_of`, `snapshot_age_hours`,
+`stale`, `hold_relaxations`), a `summary`, an `intents` list, and pass-through
+`governance_violations`. It is **dry-run only** — every intent has
+`apply: false` and nothing calls LiteLLM. Each intent maps its action to
+admin-API-shaped `changes` (throttle → scale RPM/TPM limits; downgrade → reroute
+the team alias + `app_signal` + projected saving; block/quarantine → block +
+manual `recovery`; warn → notifications). When `hold_relaxations` is set (stale
+snapshot), relaxing `allow` intents are `held` instead of clearing enforcement.
 
 ## Input Data and Configuration
 

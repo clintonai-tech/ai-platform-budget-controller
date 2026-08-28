@@ -129,6 +129,9 @@ class Defaults(BaseModel):
 
     thresholds: Thresholds
     max_staleness_hours: float = Field(gt=0)
+    #: When an over-budget team is throttled, scale its RPM/TPM/parallel limits
+    #: to this percentage of their current values.
+    throttle_to_pct: float = Field(default=50.0, gt=0, le=100)
     currency: str = "USD"
 
 

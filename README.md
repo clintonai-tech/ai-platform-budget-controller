@@ -14,11 +14,11 @@ Scaffold and inputs are in place (Tickets 1-2):
 - Input spend data at `data/spend_30d.csv` (copy of the brief's file).
 - Declarative policy at `config/budget_policy.yaml`.
 
-Done so far: typed domain models, policy loader, spend loader (CSV parsing +
-aggregation with data-quality flags), the policy evaluator (deterministic
-per-team threshold decisions + governance violations, injected clock, staleness
-handling), and the LiteLLM policy-intent exporter (dry-run JSON only). The CLI
-that ties them together follows next per [task2-plan.md](task2-plan.md).
+Done: typed domain models, policy loader, spend loader (CSV parsing + aggregation
+with data-quality flags), the policy evaluator (deterministic per-team threshold
+decisions + governance violations, injected clock, staleness handling), the
+LiteLLM policy-intent exporter (dry-run JSON only), and the `evaluate` CLI.
+Remaining per [task2-plan.md](task2-plan.md): README / review polish.
 
 ### Policy-intent JSON (exporter)
 
@@ -107,8 +107,22 @@ uv run ruff format --check .
 Run the CLI:
 
 ```bash
-uv run budget-controller --help
+# human-readable table (defaults: data/spend_30d.csv, config/budget_policy.yaml)
+uv run budget-controller evaluate
+
+# pin the evaluation time so staleness is reproducible
+uv run budget-controller evaluate --as-of 2025-12-01
+
+# schema 1.0 policy-intent JSON, and also write it to a file
+uv run budget-controller evaluate --format json
+uv run budget-controller evaluate --export-litellm intent.json
+
+# CI/cron mode: exit 1 if any enforcement action or governance violation is present
+uv run budget-controller evaluate --strict
 ```
+
+Exit codes: `0` success, `1` findings present under `--strict`, `2` inputs could
+not be read or validated.
 
 ## Planned Architecture
 

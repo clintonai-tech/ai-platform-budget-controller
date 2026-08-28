@@ -9,8 +9,9 @@ gives internal teams governed access to LLMs through a LiteLLM gateway.
 - **Task 1 — design doc** (done): `task1-design.md`
 - **Task 2 — build one component** (done): **Option B — tiered budget enforcement
   with graceful downgrade**. Build plan: `task2-plan.md` (8 tickets, all done).
-- **Task 3 — architecture diagram**: README has a mermaid flow; a standalone
-  diagram deliverable is not done.
+- **Task 3 — architecture diagram** (done): `task3-architecture.drawio`
+  (target-state; current solid, proposed dashed-green). README also has a
+  mermaid quick-view.
 
 The component (`budget-controller`) is a periodic controller: it reads accumulated
 team spend, evaluates declarative budget policy against 75% / 90% / 100%

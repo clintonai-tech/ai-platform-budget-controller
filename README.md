@@ -57,6 +57,13 @@ flowchart LR
 Solid arrows are built in this repo; dotted arrows are the production
 integrations left as future work.
 
+The full target-state diagram (Task 3) is
+[`task3-architecture.drawio`](task3-architecture.drawio) — open it in
+[diagrams.net](https://app.diagrams.net). It shows the current stack solid and
+the proposed additions dashed-green, with colour-coded request / spend-loop /
+trace / audit / metrics / self-service / agentic-tool paths and the assumptions
+on-canvas.
+
 **Flow:** spend source (a CSV here, LiteLLM/Postgres in production)
 → `budget-controller` (load → evaluate → export)
 → policy-intent JSON

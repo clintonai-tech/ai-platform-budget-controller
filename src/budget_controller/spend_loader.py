@@ -6,7 +6,8 @@ Design choices:
   a hard :class:`SpendLoadError` - the input is unusable. A bad *value* inside a
   row is not: it is coerced to a safe default and recorded as a
   :class:`DataQualityFlag` so the evaluator and the operator can see it.
-* **Standard-library ``csv`` only** (see CLAUDE.md). The file is ~150 rows.
+* **Standard-library ``csv`` only** - the file is ~150 rows and auditability
+  matters more than convenience.
 * **No policy here.** The loader does not know team allow-lists, so it cannot
   judge "off-catalogue model" - that check lives in the evaluator, which has the
   policy. The loader only reports what the data says.

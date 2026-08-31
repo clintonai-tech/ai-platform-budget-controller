@@ -64,6 +64,13 @@ flowchart LR
    | `require_explicit_signal` | keep serving, `app_signal` only |
    | `block` / `quarantine` | block, manual `recovery` |
 
+   The `changes` are a **stable intermediate representation, not a LiteLLM wire
+   payload.** A thin applier (future work) translates each into an admin-API
+   call (`/team/update`, `/key/block`, …) and resolves relative values — e.g.
+   `throttle`'s `scale` factor — against the gateway's live limits. Keeping the
+   decision engine decoupled from LiteLLM's exact API is deliberate: the schema
+   is versioned so it can be pinned down against a real gateway later.
+
 ## Layout
 
 ```

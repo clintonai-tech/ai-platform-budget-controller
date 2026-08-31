@@ -8,7 +8,7 @@ gives internal teams governed access to LLMs through a LiteLLM gateway.
 - **Assignment**: `docs/AI Platform Engineer - Case Study 2026.pdf` (git-ignored)
 - **Task 1 — design doc** (done): `task1-design.md`
 - **Task 2 — build one component** (done): **Option B — tiered budget enforcement
-  with graceful downgrade**. Build plan: `task2-plan.md` (8 tickets, all done).
+  with graceful downgrade**. The `budget-controller` package + tests.
 - **Task 3 — architecture diagram** (done): `task3-architecture.drawio`
   (target-state; current solid, proposed dashed-green). README also has a
   mermaid quick-view.
@@ -72,7 +72,7 @@ If conda is active you'll see a harmless
   freshness/lag figure, and stale data must not be used to *lift* enforcement.
 - **Never commit `.env`** — only `.env.example`. The submission repo is private.
 
-## v1 scope guardrails (from task2-plan.md)
+## v1 scope guardrails
 
 Not in this version: live LiteLLM admin API mutation, AWS calls, Datadog metric
 emission, real provider keys, Postgres integration, Terraform / Lambda /
@@ -81,6 +81,6 @@ pre-call cost blocking.
 
 ## Workflow
 
-Tickets 1–8 in `task2-plan.md` are complete. Small and complete beats large and
-half done. Keep the README, this file, and the tests in sync when changing
-behaviour. Every commit message: no "Claude Code" / co-author lines (user asked).
+Task 2 is complete. Small and complete beats large and half done. Keep the
+README, this file, and the tests in sync when changing behaviour. Every commit
+message: no "Claude Code" / co-author lines (user asked).

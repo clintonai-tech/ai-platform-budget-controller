@@ -9,8 +9,7 @@ emits per-team decisions plus a LiteLLM-shaped policy-intent JSON. **Dry-run
 only** — it never calls LiteLLM, AWS, or Datadog, so the decision logic stays
 pure and testable.
 
-Design: [task1-design.md](task1-design.md) · build plan:
-[task2-plan.md](task2-plan.md) · target-state diagram:
+Design: [task1-design.md](task1-design.md) · target-state diagram:
 [task3-architecture.drawio](task3-architecture.drawio)
 ([diagrams.net](https://app.diagrams.net)).
 

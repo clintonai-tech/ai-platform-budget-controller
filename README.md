@@ -1,6 +1,5 @@
 # AI Platform Budget Controller
-
-Take-home for an AI Platform Engineer role — **Task 2, Option B: tiered budget
+ — **Tiered budget
 enforcement with graceful downgrade.**
 
 `budget-controller` reads a snapshot of accumulated per-team LLM spend, evaluates
@@ -13,7 +12,6 @@ Design: [task1-design.md](task1-design.md) · target-state diagram:
 [task3-architecture.drawio](task3-architecture.drawio)
 ([diagrams.net](https://app.diagrams.net)).
 
-## Why Option B
 
 It exercises the brief's cost-governance goal directly, and the hard parts are
 judgement calls rather than plumbing: **which workloads tolerate a silent model
